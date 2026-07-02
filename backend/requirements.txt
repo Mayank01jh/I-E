@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+motor
+beanie
+pandas
+openpyxl
+pydantic
+python-dotenv
+twilio
+resend

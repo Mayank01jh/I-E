@@ -1,0 +1,16 @@
+{
+  "name": "expense-dashboard-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names \"BACKEND,FRONTEND\" --prefix-colors \"green,white\" \"python backend/main.py\" \"npm run dev --prefix frontend\"",
+    "backend": "python backend/main.py",
+    "frontend": "npm run dev --prefix frontend",
+    "install:all": "npm install; npm install --prefix frontend",
+    "seed": "curl.exe -X POST http://localhost:8000/api/seed/run",
+    "build": "npm run build --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
