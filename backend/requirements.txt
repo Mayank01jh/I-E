@@ -8,3 +8,6 @@ pydantic
 python-dotenv
 twilio
 resend
+bcrypt
+python-jose
+email-validator
