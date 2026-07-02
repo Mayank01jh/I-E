@@ -1,8 +1,12 @@
-# Deploying FastAPI Backend (`ie-backend`) to AWS ECR
+# Deploying Expense Dashboard to AWS & Vercel
 
-This guide outlines the terminal procedure to build, tag, and push the backend Docker image to Amazon ECR (Elastic Container Registry).
+This guide outlines the deployment procedures for both the FastAPI backend (`ie-backend`) and the Next.js frontend, including linking them using environment variables.
 
 ---
+
+## Part 1: Deploying the FastAPI Backend to AWS
+
+This section covers how to push your backend Docker image to Amazon ECR (Elastic Container Registry).
 
 ### Step 1: Authenticate Local Terminal with AWS
 
@@ -68,3 +72,18 @@ Once the push completes, the image is securely stored on AWS.
 ```bash
 docker pull <aws_account_id>.dkr.ecr.<your-region>.amazonaws.com/ie-backend:latest
 ```
+
+---
+
+## Part 2: Deploying the Next.js Frontend
+
+When deploying the frontend to hosting platforms (such as Vercel, Netlify, or AWS Amplify), you must link it to the backend you deployed in Part 1.
+
+### Step 3: Add Production Environment Variables
+
+Before clicking deploy, expand the **Environment Variables** section. This is critical so your frontend knows how to talk to your AWS backend.
+
+Add the following variable:
+
+- **Key:** `NEXT_PUBLIC_API_URL`
+- **Value:** Your live FastAPI production URL on AWS (e.g., `https://ie-backend-xxxx.awsapprunner.com` or your EC2 public IP).
