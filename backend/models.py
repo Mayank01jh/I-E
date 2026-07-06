@@ -41,6 +41,8 @@ DEFAULT_BUDGET_LIMITS = {
 class User(Document):
     username:      str
     password_hash: str
+    email:         Optional[str] = None
+    whatsapp:      Optional[str] = None
     created_at:    datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
@@ -77,6 +79,20 @@ class UpcomingBill(Document):
 
     class Settings:
         name = "upcoming_bills"
+        indexes = ["user_id"]
+
+
+class SavingsGoal(Document):
+    user_id:        Optional[str] = None
+    title:          str
+    target_amount:  float
+    current_amount: float = 0.0
+    target_date:    Optional[datetime] = None
+    category:       str = "Savings"
+    created_at:     datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "savings_goals"
         indexes = ["user_id"]
 
 

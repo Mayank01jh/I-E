@@ -31,7 +31,14 @@ class Token(BaseModel):
 class UserOut(BaseModel):
     id: str
     username: str
+    email: Optional[str] = None
+    whatsapp: Optional[str] = None
     created_at: datetime
+
+
+class ProfileUpdateIn(BaseModel):
+    email: Optional[str] = None
+    whatsapp: Optional[str] = None
 
 
 def hash_password(password: str) -> str:
@@ -129,5 +136,21 @@ async def get_me(user: User = Depends(get_current_user)):
     return {
         "id": str(user.id),
         "username": user.username,
+        "email": user.email,
+        "whatsapp": user.whatsapp,
+        "created_at": user.created_at,
+    }
+
+
+@router.put("/profile", response_model=UserOut)
+async def update_profile(data: ProfileUpdateIn, user: User = Depends(get_current_user)):
+    user.email = data.email
+    user.whatsapp = data.whatsapp
+    await user.save()
+    return {
+        "id": str(user.id),
+        "username": user.username,
+        "email": user.email,
+        "whatsapp": user.whatsapp,
         "created_at": user.created_at,
     }

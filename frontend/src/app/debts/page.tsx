@@ -4,6 +4,11 @@ import Sidebar from '@/components/Sidebar';
 import { api } from '@/lib/api';
 import { DebtRecord, UpcomingBill } from '@/types';
 
+const MONTHS_FULL = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 export default function DebtsPage() {
   const [debts, setDebts] = useState<DebtRecord[]>([]);
   const [bills, setBills] = useState<UpcomingBill[]>([]);
@@ -38,6 +43,13 @@ export default function DebtsPage() {
   const [auditing, setAuditing] = useState(false);
 
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  // Calendar states
+  const now = new Date();
+  const [calYear, setCalYear] = useState(now.getFullYear());
+  const [calMonth, setCalMonth] = useState(now.getMonth());
+  const [selectedDate, setSelectedDate] = useState<number | null>(null);
+  const [sendingBillReminderId, setSendingBillReminderId] = useState<string | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -168,6 +180,64 @@ export default function DebtsPage() {
       showToast('Failed to delete bill', 'error');
     }
   };
+
+  // Calendar helpers
+  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
+  const getFirstDayOfMonth = (y: number, m: number) => new Date(y, m, 1).getDay();
+
+  const daysInMonth = getDaysInMonth(calYear, calMonth);
+  const firstDayIndex = getFirstDayOfMonth(calYear, calMonth);
+  const blankDays = Array(firstDayIndex).fill(null);
+  const monthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const allDays = [...blankDays, ...monthDays];
+
+  const getBillsForDate = (day: number) => {
+    return bills.filter(b => {
+      if (!b.due_date) return false;
+      const d = new Date(b.due_date);
+      return d.getFullYear() === calYear && d.getMonth() === calMonth && d.getDate() === day;
+    });
+  };
+
+  const prevMonth = () => {
+    if (calMonth === 0) {
+      setCalMonth(11);
+      setCalYear(calYear - 1);
+    } else {
+      setCalMonth(calMonth - 1);
+    }
+    setSelectedDate(null);
+  };
+
+  const nextMonth = () => {
+    if (calMonth === 11) {
+      setCalMonth(0);
+      setCalYear(calYear + 1);
+    } else {
+      setCalMonth(calMonth + 1);
+    }
+    setSelectedDate(null);
+  };
+
+  const triggerBillReminder = async (id: string) => {
+    setSendingBillReminderId(id);
+    try {
+      await api.sendBillReminder(id);
+      showToast('Bill reminder successfully sent to your profile contacts!');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to dispatch bill reminder. Make sure your profile settings have email/whatsapp configured.', 'error');
+    } finally {
+      setSendingBillReminderId(null);
+    }
+  };
+
+  const filteredBills = selectedDate 
+    ? bills.filter(b => {
+        if (!b.due_date) return false;
+        const d = new Date(b.due_date);
+        return d.getFullYear() === calYear && d.getMonth() === calMonth && d.getDate() === selectedDate;
+      })
+    : bills;
 
   // Budget threshold check handler
   const handleRunAudit = async () => {
@@ -388,11 +458,94 @@ export default function DebtsPage() {
               </button>
             </div>
 
+            {/* Calendar Grid View */}
+            <div style={{ marginBottom: 20, padding: 12, background: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>
+                  {MONTHS_FULL[calMonth]} {calYear}
+                </span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={prevMonth} className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: 11, borderColor: 'var(--border)' }}>◀</button>
+                  <button onClick={nextMonth} className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: 11, borderColor: 'var(--border)' }}>▶</button>
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, textAlign: 'center', fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, idx) => (
+                  <div key={idx}>{d}</div>
+                ))}
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+                {allDays.map((day, idx) => {
+                  if (day === null) {
+                    return <div key={`empty-${idx}`} style={{ height: 28 }} />;
+                  }
+                  
+                  const dayBills = getBillsForDate(day);
+                  const hasBills = dayBills.length > 0;
+                  const allPaid = hasBills && dayBills.every(b => b.is_paid);
+                  const isSelected = selectedDate === day;
+                  
+                  return (
+                    <button
+                      key={`day-${day}`}
+                      type="button"
+                      onClick={() => setSelectedDate(isSelected ? null : day)}
+                      style={{
+                        height: 28,
+                        background: isSelected ? 'var(--accent-purple)' : 'transparent',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        color: isSelected ? '#ffffff' : 'var(--text-primary)',
+                        fontSize: 11,
+                        fontWeight: isSelected ? 700 : 400,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        transition: 'all 0.2s ease',
+                      }}
+                      className="calendar-day-btn"
+                    >
+                      {day}
+                      {hasBills && (
+                        <span style={{
+                          width: 4,
+                          height: 4,
+                          borderRadius: '50%',
+                          background: allPaid ? '#10b981' : '#f59e0b',
+                          position: 'absolute',
+                          bottom: 2
+                        }} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {selectedDate && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, padding: '6px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-sm)', fontSize: 11 }}>
+                <span>Showing bills due on: <strong>{selectedDate} {MONTHS_FULL[calMonth]}</strong></span>
+                <button 
+                  onClick={() => setSelectedDate(null)} 
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-purple)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Clear Filter
+                </button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {bills.length === 0 ? (
-                <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: 13 }}>No scheduled bills configured</p>
+              {filteredBills.length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: 13 }}>
+                  {selectedDate ? 'No bills due on this date' : 'No scheduled bills configured'}
+                </p>
               ) : (
-                bills.map(bill => (
+                filteredBills.map(bill => (
                   <div 
                     key={bill._id} 
                     style={{ 
@@ -431,6 +584,18 @@ export default function DebtsPage() {
                       <span className={`badge ${bill.is_paid ? 'badge-income' : 'badge-expense'}`} style={{ fontSize: 9 }}>
                         {bill.is_paid ? 'PAID' : 'DUE'}
                       </span>
+
+                      {!bill.is_paid && (
+                        <button
+                          onClick={() => triggerBillReminder(bill._id)}
+                          disabled={sendingBillReminderId === bill._id}
+                          className="btn btn-ghost btn-sm"
+                          style={{ padding: '6px 8px', borderColor: 'var(--border)' }}
+                          title="Send Bill Reminder Alert"
+                        >
+                          {sendingBillReminderId === bill._id ? '⏳' : '✉️'}
+                        </button>
+                      )}
 
                       <button
                         onClick={() => handleDeleteBill(bill._id)}

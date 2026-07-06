@@ -72,3 +72,48 @@ async def delete_bill(bill_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Not found")
     await bill.delete()
     return {"message": "Deleted"}
+
+
+# ── Remind ────────────────────────────────────────────────────
+@router.post("/remind/{bill_id}")
+async def remind_bill(bill_id: str, user=Depends(get_current_user)):
+    bill = await UpcomingBill.get(bill_id)
+    if not bill or bill.user_id != str(user.id):
+        raise HTTPException(status_code=404, detail="Bill not found")
+
+    if not user.email and not user.whatsapp:
+        raise HTTPException(
+            status_code=400,
+            detail="No contact methods configured. Please set your Email or WhatsApp in Profile Settings."
+        )
+
+    due_str = bill.due_date.strftime("%Y-%m-%d") if bill.due_date else "N/A"
+
+    email_res = None
+    if user.email:
+        from routers.alerts import send_email_alert
+        subject = f"Reminder: Bill Due - {bill.title}"
+        html = f"""
+        <h3>Upcoming Bill Reminder</h3>
+        <p>Your bill <strong>{bill.title}</strong> is due.</p>
+        <ul>
+            <li><strong>Amount:</strong> {bill.amount}</li>
+            <li><strong>Due Date:</strong> {due_str}</li>
+            <li><strong>Category:</strong> {bill.category}</li>
+        </ul>
+        <p>Please pay it soon or mark it as paid in your dashboard.</p>
+        """
+        email_res = send_email_alert(user.email, subject, html)
+
+    whatsapp_res = None
+    if user.whatsapp:
+        from routers.alerts import send_whatsapp_alert
+        msg = f"Reminder: Your bill '{bill.title}' of {bill.amount} is due on {due_str}."
+        whatsapp_res = send_whatsapp_alert(user.whatsapp, msg)
+
+    return {
+        "message": "Reminders processed",
+        "email_status": email_res,
+        "whatsapp_status": whatsapp_res
+    }
+

@@ -30,6 +30,12 @@ export default function Dashboard() {
   const [toast, setToast] = useState<{ msg: string; type: 'success'|'error' } | null>(null);
   const [authorized, setAuthorized] = useState(false);
 
+  // File Upload states
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -86,6 +92,50 @@ export default function Dashboard() {
     setSeeding(false);
   };
 
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      const res = await api.uploadSpreadsheet(formData);
+      showToast(res.message || 'File uploaded successfully!', 'success');
+      setShowUploadModal(false);
+      setSelectedFile(null);
+      load();
+    } catch (err: any) {
+      showToast(err.message || 'Upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      const name = file.name.toLowerCase();
+      if (name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls')) {
+        setSelectedFile(file);
+      } else {
+        showToast('Please upload a .csv or .xlsx file', 'error');
+      }
+    }
+  };
+
   const handleAddTx = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!txAmount || !txCat) return;
@@ -130,6 +180,9 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <MonthlyPurgeControl currentYear={year} currentMonth={MONTHS[month-1]} onRefresh={load} />
+            <button className="btn btn-ghost" onClick={() => setShowUploadModal(true)}>
+              📤 Import File
+            </button>
             <button className="btn btn-ghost" onClick={() => setShowAnalyzer(!showAnalyzer)}>
               📊 {showAnalyzer ? 'Hide Local Analysis' : 'Local Analysis'}
             </button>
@@ -355,6 +408,71 @@ export default function Dashboard() {
               <button id="submit-transaction-btn" type="submit" className="btn btn-primary" disabled={saving}>
                 {saving ? <span className="spinner" /> : null}
                 {saving ? 'Saving…' : `+ Log ${txType === 'EXPENSE' ? 'Expense' : 'Income'}`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Spreadsheet Modal */}
+      {showUploadModal && (
+        <div className="modal-overlay" onClick={() => { if (!uploading) setShowUploadModal(false); }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <div className="modal-title">Upload Spreadsheet (.csv, .xlsx)</div>
+              <button className="btn btn-ghost btn-icon" onClick={() => setShowUploadModal(false)} disabled={uploading}>✕</button>
+            </div>
+            
+            <form onSubmit={handleUploadSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div 
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                style={{
+                  border: `2px dashed ${dragActive ? 'var(--accent-purple)' : 'var(--border)'}`,
+                  borderRadius: 'var(--radius-md)',
+                  padding: '32px 20px',
+                  textAlign: 'center',
+                  background: dragActive ? 'rgba(139, 92, 246, 0.05)' : 'var(--bg-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  position: 'relative'
+                }}
+              >
+                <input 
+                  type="file" 
+                  id="spreadsheet-file-input"
+                  accept=".csv, .xlsx, .xls"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      setSelectedFile(e.target.files[0]);
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 0, left: 0, width: '100%', height: '100%',
+                    opacity: 0, cursor: 'pointer'
+                  }}
+                  disabled={uploading}
+                />
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📄</div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>
+                  {selectedFile ? selectedFile.name : 'Drag & drop your file here'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'Supports standard lists & matrix spreadsheets (.csv, .xlsx)'}
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ width: '100%', padding: '10px' }} 
+                disabled={!selectedFile || uploading}
+              >
+                {uploading ? <span className="spinner" style={{ marginRight: 6 }} /> : null}
+                {uploading ? 'Importing...' : 'Start Spreadsheet Import'}
               </button>
             </form>
           </div>

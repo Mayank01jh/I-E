@@ -41,6 +41,48 @@ async def list_transactions(
     return {"transactions": txns, "total": total, "page": page, "limit": limit}
 
 
+@router.get("/export")
+async def export_transactions(
+    year:     Optional[int] = None,
+    month:    Optional[int] = None,
+    category: Optional[str] = None,
+    type:     Optional[str] = None,
+    user: User = Depends(get_current_user),
+):
+    q: dict = {"user_id": str(user.id)}
+    if year:     q["year"]     = year
+    if month:    q["month"]    = month
+    if category: q["category"] = category
+    if type:     q["type"]     = type
+    
+    txns = await Transaction.find(q).sort(-Transaction.date).to_list()
+    
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+    
+    def generate_csv():
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Date", "Type", "Category", "Amount", "Notes", "Source"])
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
+        
+        for tx in txns:
+            dt_str = tx.date.strftime("%Y-%m-%d") if tx.date else ""
+            writer.writerow([dt_str, tx.type, tx.category, tx.amount, tx.notes, tx.source])
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate(0)
+            
+    headers = {
+        'Content-Disposition': 'attachment; filename="transactions_export.csv"'
+    }
+    return StreamingResponse(generate_csv(), media_type="text/csv", headers=headers)
+
+
+
 @router.post("", status_code=201)
 async def create_transaction(data: TransactionIn, user: User = Depends(get_current_user)):
     d = data.date or datetime.utcnow()

@@ -22,6 +22,7 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null);
   const [authorized, setAuthorized] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -122,6 +123,34 @@ export default function TransactionsPage() {
     catch { showToast('Failed', 'error'); }
   };
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params: Record<string, string | number> = {};
+      if (filterYear)  params.year  = filterYear;
+      if (filterMonth) params.month = filterMonth;
+      if (filterCat)   params.category = filterCat;
+      if (filterType)  params.type  = filterType;
+      
+      const blob = await api.exportTransactions(params);
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions_${filterYear || 'all'}_${filterMonth || 'all'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      showToast('Transactions exported successfully!');
+    } catch {
+      showToast('Export failed', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const totalPages = Math.ceil(total / 20);
 
   return (
@@ -133,7 +162,17 @@ export default function TransactionsPage() {
             <h1>Transactions</h1>
             <p>{total} records found</p>
           </div>
-          <button className="btn btn-primary" onClick={openAdd} id="add-tx-btn">+ Add Expense</button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button 
+              className="btn btn-ghost" 
+              onClick={handleExport} 
+              disabled={exporting}
+              style={{ borderColor: 'var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              {exporting ? '⏳' : '📥'} {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+            <button className="btn btn-primary" onClick={openAdd} id="add-tx-btn">+ Add Expense</button>
+          </div>
         </div>
 
         {/* Filters */}

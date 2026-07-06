@@ -29,8 +29,8 @@ PORT        = int(os.getenv("BACKEND_PORT", 8000))
 # Add backend/ to path so routers can import models
 sys.path.insert(0, str(Path(__file__).parent))
 
-from models import Transaction, Category, Budget, User, DebtRecord, UpcomingBill, DEFAULT_CATEGORIES
-from routers import transactions, categories, analytics, budget, seed, auth, debts, bills
+from models import Transaction, Category, Budget, User, DebtRecord, UpcomingBill, SavingsGoal, DEFAULT_CATEGORIES
+from routers import transactions, categories, analytics, budget, seed, auth, debts, bills, goals
 
 
 @asynccontextmanager
@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
     client = AsyncIOMotorClient(MONGODB_URI)
     await init_beanie(
         database=client[DB_NAME],
-        document_models=[Transaction, Category, Budget, User, DebtRecord, UpcomingBill],
+        document_models=[Transaction, Category, Budget, User, DebtRecord, UpcomingBill, SavingsGoal],
     )
     print(f"[Backend] Connected to database: {DB_NAME}")
 
@@ -138,6 +138,7 @@ app.include_router(budget.router)
 app.include_router(seed.router)
 app.include_router(debts.router)
 app.include_router(bills.router)
+app.include_router(goals.router)
 
 
 @app.get("/")

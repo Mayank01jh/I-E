@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { api } from '../lib/api';
 
 const NAV = [
   { href: '/',              icon: '📊', label: 'Dashboard', shortLabel: 'Home' },
@@ -20,6 +21,12 @@ export default function Sidebar() {
   const [isDesktopScreen, setIsDesktopScreen] = useState(false);
   const [showPopover, setShowPopover] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Profile modal settings states
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [whatsappInput, setWhatsappInput] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
 
   useEffect(() => {
     // 1. Get username
@@ -59,11 +66,32 @@ export default function Sidebar() {
     };
     document.addEventListener('mousedown', handleClickOutside);
 
+    // Fetch user profile settings
+    api.getMe().then(user => {
+      setEmailInput(user.email || '');
+      setWhatsappInput(user.whatsapp || '');
+    }).catch(err => {
+      console.warn("Could not load user profile details. User may not be logged in yet.", err);
+    });
+
     return () => {
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileSaving(true);
+    try {
+      await api.updateProfile({ email: emailInput, whatsapp: whatsappInput });
+      setIsProfileModalOpen(false);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update profile settings');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -157,10 +185,18 @@ export default function Sidebar() {
             }}>
               {username[0]?.toUpperCase() || 'U'}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
               <span style={{ fontWeight: 600, fontSize: 13, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{username}</span>
               <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Free Account</span>
             </div>
+            <button
+              onClick={() => setIsProfileModalOpen(true)}
+              className="btn btn-ghost btn-icon btn-sm"
+              title="Edit profile settings"
+              style={{ width: 28, height: 28, padding: 0 }}
+            >
+              ⚙️
+            </button>
           </div>
 
           <button
@@ -220,6 +256,11 @@ export default function Sidebar() {
 
               <div className="settings-popover-divider" />
               
+              <button onClick={() => { setIsProfileModalOpen(true); setShowPopover(false); }} className="settings-popover-item">
+                <span>Profile Settings</span>
+                <span>⚙️</span>
+              </button>
+              
               <button onClick={handleLogout} className="settings-popover-item" style={{ color: 'var(--accent-red)' }}>
                 <span>Log Out</span>
                 <span>🚪</span>
@@ -242,6 +283,70 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
+
+      {/* ── PROFILE CONFIGURATION MODAL ── */}
+      {isProfileModalOpen && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: '16px'
+        }}>
+          <div className="modal-content" style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '400px',
+            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.5)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>Configure Profile</h3>
+              <button 
+                onClick={() => setIsProfileModalOpen(false)} 
+                className="btn btn-ghost" 
+                style={{ padding: 4, width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Email Address</label>
+                <input 
+                  type="email" 
+                  className="input" 
+                  placeholder="e.g. you@example.com"
+                  value={emailInput}
+                  onChange={e => setEmailInput(e.target.value)}
+                  style={{ width: '100%', background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>WhatsApp Number</label>
+                <input 
+                  type="tel" 
+                  className="input" 
+                  placeholder="e.g. +91XXXXXXXXXX"
+                  value={whatsappInput}
+                  onChange={e => setWhatsappInput(e.target.value)}
+                  style={{ width: '100%', background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}
+                />
+                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Include country code prefix (e.g. +91 or +1)</span>
+              </div>
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ width: '100%', padding: '10px', marginTop: '8px' }}
+                disabled={profileSaving}
+              >
+                {profileSaving ? 'Saving...' : 'Save Settings'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }

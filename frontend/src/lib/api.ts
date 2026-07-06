@@ -119,7 +119,66 @@ export const api = {
     safeFetch(`${BASE}/api/bills/${id}/pay`, { method: 'PUT' }),
   deleteBill: (id: string) =>
     safeFetch(`${BASE}/api/bills/${id}`, { method: 'DELETE' }),
+  sendBillReminder: (id: string) =>
+    safeFetch(`${BASE}/api/bills/remind/${id}`, { method: 'POST' }),
+
+  // Profile Settings
+  updateProfile: (data: { email?: string; whatsapp?: string }) =>
+    safeFetch(`${BASE}/api/auth/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  // Savings Goals
+  getGoals: () => safeFetch(`${BASE}/api/goals`),
+  createGoal: (data: { title: string; target_amount: number; current_amount?: number; target_date?: string; category?: string }) =>
+    safeFetch(`${BASE}/api/goals`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  deleteGoal: (id: string) =>
+    safeFetch(`${BASE}/api/goals/${id}`, { method: 'DELETE' }),
+  contributeToGoal: (id: string, amount: number) =>
+    safeFetch(`${BASE}/api/goals/${id}/contribute`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount }),
+    }),
+
+  // File Upload
+  uploadSpreadsheet: (formData: FormData) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const authHeaders: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+    // Note: Do not specify Content-Type because browser automatically sets boundary for FormData
+    return fetch(`${BASE}/api/seed/upload`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: formData,
+    }).then(r => {
+      if (!r.ok) {
+        return r.json().then(err => { throw new Error(err.detail || 'Upload failed') });
+      }
+      return r.json();
+    });
+  },
+
+  // Export Transactions (via Fetch + Blob download)
+  exportTransactions: async (params?: Record<string, string | number>) => {
+    const q = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const authHeaders: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const response = await fetch(`${BASE}/api/transactions/export${q}`, {
+      headers: authHeaders,
+    });
+    if (!response.ok) {
+      throw new Error('Export failed');
+    }
+    return response.blob();
+  },
 
   // Budget threshold alerts
   checkBudgetAlerts: () => safeFetch(`${BASE}/api/analytics/check-budget`),
 };
+
