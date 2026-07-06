@@ -24,7 +24,7 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 DB_NAME     = os.getenv("DB_NAME", "expense_db")
-PORT        = int(os.getenv("BACKEND_PORT", 8000))
+PORT        = int(os.getenv("BACKEND_PORT", os.getenv("PORT", "8000")))
 
 # Add backend/ to path so routers can import models
 sys.path.insert(0, str(Path(__file__).parent))
