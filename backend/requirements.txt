@@ -11,3 +11,4 @@ resend
 bcrypt
 python-jose
 email-validator
+python-multipart
