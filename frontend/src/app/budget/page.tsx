@@ -14,6 +14,7 @@ export default function BudgetPage() {
   const [budget, setBudget] = useState<{ baseline: number; categories: Record<string, number> } | null>(null);
   const [editing, setEditing] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, number>>({});
+  const [spentMap, setSpentMap] = useState<Record<string, number>>({});
   const [baseline, setBaseline] = useState(0);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -52,6 +53,22 @@ export default function BudgetPage() {
       setBudget(data);
       setBaseline(data.baseline ?? 0);
       setEditValues(data.categories ?? {});
+
+      // Fetch actual category spending
+      try {
+        const analytics = await api.getMonthlyAnalytics(year, month);
+        const sMap: Record<string, number> = {};
+        if (analytics && analytics.byCategory) {
+          analytics.byCategory.forEach((item: any) => {
+            if (item.category) {
+              sMap[item.category] = item.total;
+            }
+          });
+        }
+        setSpentMap(sMap);
+      } catch (e) {
+        console.error("Failed to load actual expenses", e);
+      }
     } catch {}
   }, [year, month]);
 
@@ -142,6 +159,8 @@ export default function BudgetPage() {
 
   const totalBudgeted = Object.values(editValues).reduce((s, v) => s + (v || 0), 0);
   const remaining = baseline - totalBudgeted;
+  const totalSpent = Object.values(spentMap).reduce((s, v) => s + (v || 0), 0);
+  const remainingBudget = totalBudgeted - totalSpent;
 
   return (
     <div className="app-layout">
@@ -170,17 +189,18 @@ export default function BudgetPage() {
         </div>
 
         {/* Summary */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 28 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
           {[
-            { label: 'Monthly Income', value: fmt(baseline), color: 'var(--text-primary)' },
-            { label: 'Total Budgeted', value: fmt(totalBudgeted), color: 'var(--text-secondary)' },
-            { label: 'Unallocated',    value: fmt(Math.max(0, remaining)), color: remaining < 0 ? '#ffffff' : 'var(--text-primary)' },
+            { label: 'Monthly Income', value: fmt(baseline), color: 'var(--text-primary)', warning: null },
+            { label: 'Total Budgeted', value: fmt(totalBudgeted), color: 'var(--text-secondary)', warning: remaining < 0 ? `Over-budgeted by ${fmt(Math.abs(remaining))}` : null },
+            { label: 'Actual Expenses', value: fmt(totalSpent), color: totalSpent > totalBudgeted ? 'var(--accent-red)' : 'var(--text-primary)', warning: totalSpent > totalBudgeted ? `Over budget by ${fmt(totalSpent - totalBudgeted)}` : null },
+            { label: 'Remaining Budget', value: fmt(remainingBudget), color: remainingBudget < 0 ? 'var(--accent-red)' : 'var(--text-primary)', warning: remainingBudget < 0 ? `Overspent by ${fmt(Math.abs(remainingBudget))}` : null },
           ].map(s => (
             <div key={s.label} className="card" style={{ textAlign: 'center' }}>
               <div className="stat-label">{s.label}</div>
               <div className="stat-value" style={{ color: s.color, marginTop: 8 }}>{s.value}</div>
-              {remaining < 0 && s.label === 'Unallocated' && (
-                <div style={{ color: 'var(--accent-red)', fontSize: 11, marginTop: 4 }}>⚠ Over-budgeted by {fmt(Math.abs(remaining))}</div>
+              {s.warning && (
+                <div style={{ color: 'var(--accent-red)', fontSize: 11, marginTop: 4 }}>⚠ {s.warning}</div>
               )}
             </div>
           ))}
@@ -203,26 +223,80 @@ export default function BudgetPage() {
             <div className="chart-title" style={{ marginBottom: 20 }}>Category Limits</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {DEFAULT_CATS.map(cat => {
-                const val = editValues[cat] || 0;
-                const pct = baseline > 0 ? (val / baseline) * 100 : 0;
+                const limit = editValues[cat] || 0;
+                const spent = spentMap[cat] || 0;
+
+                // Progress percentage calculation
+                let pct = 0;
+                if (limit > 0) {
+                  pct = (spent / limit) * 100;
+                } else if (spent > 0) {
+                  pct = 100;
+                }
+
+                // Color coding for health status
+                let barColor = 'var(--accent-green)';
+                let isOver = false;
+                let warningText = '';
+
+                if (limit > 0) {
+                  if (spent > limit) {
+                    barColor = 'var(--accent-red)';
+                    isOver = true;
+                    warningText = `Over by ${fmt(spent - limit)}`;
+                  } else if (spent >= limit * 0.8) {
+                    barColor = 'var(--accent-amber)';
+                    warningText = 'Approaching limit';
+                  }
+                } else if (spent > 0) {
+                  barColor = 'var(--accent-red)';
+                  isOver = true;
+                  warningText = 'No limit set';
+                }
+
                 return (
-                  <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <div style={{ width: 140, fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', flexShrink: 0 }}>{cat}</div>
-                    {editing ? (
-                      <input
-                        type="number" min="0" step="100"
-                        className="form-input"
-                        style={{ width: 110, flexShrink: 0 }}
-                        value={val}
-                        onChange={e => setEditValues(prev => ({ ...prev, [cat]: parseFloat(e.target.value) || 0 }))}
-                      />
-                    ) : (
-                      <div style={{ width: 110, fontWeight: 600, flexShrink: 0 }}>{fmt(val)}</div>
-                    )}
-                    <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: '#ffffff', borderRadius: 3, transition: 'width 0.4s ease' }} />
+                  <div key={cat} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {cat}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        {editing ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Limit:</span>
+                            <input
+                              type="number" min="0" step="100"
+                              className="form-input"
+                              style={{ width: 100, padding: '4px 8px', fontSize: '12px' }}
+                              value={limit}
+                              onChange={e => setEditValues(prev => ({ ...prev, [cat]: parseFloat(e.target.value) || 0 }))}
+                            />
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                            <span style={{ fontWeight: 700, color: isOver ? 'var(--accent-red)' : 'var(--text-primary)' }}>{fmt(spent)}</span>
+                            <span style={{ color: 'var(--text-muted)', margin: '0 4px' }}>/</span>
+                            <span>{fmt(limit)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div style={{ width: 40, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', flexShrink: 0 }}>{pct.toFixed(0)}%</div>
+
+                    {!editing && (
+                      <>
+                        <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: barColor, borderRadius: 3, transition: 'width 0.4s ease' }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                          <span style={{ color: isOver ? 'var(--accent-red)' : warningText ? 'var(--accent-amber)' : 'var(--text-muted)', fontWeight: warningText ? 500 : 400 }}>
+                            {warningText ? `⚠ ${warningText}` : 'Healthy'}
+                          </span>
+                          <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                            {pct.toFixed(0)}% spent
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}

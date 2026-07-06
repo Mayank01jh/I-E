@@ -37,8 +37,19 @@ class UserOut(BaseModel):
 
 
 class ProfileUpdateIn(BaseModel):
+    username: Optional[str] = None
+    password: Optional[str] = None
     email: Optional[str] = None
     whatsapp: Optional[str] = None
+
+
+class ProfileResponse(BaseModel):
+    id: str
+    username: str
+    email: Optional[str] = None
+    whatsapp: Optional[str] = None
+    created_at: datetime
+    access_token: Optional[str] = None
 
 
 def hash_password(password: str) -> str:
@@ -142,10 +153,30 @@ async def get_me(user: User = Depends(get_current_user)):
     }
 
 
-@router.put("/profile", response_model=UserOut)
+@router.put("/profile", response_model=ProfileResponse)
 async def update_profile(data: ProfileUpdateIn, user: User = Depends(get_current_user)):
-    user.email = data.email
-    user.whatsapp = data.whatsapp
+    token = None
+    if data.username is not None:
+        new_username = data.username.strip()
+        if new_username and new_username != user.username:
+            existing = await User.find_one(User.username == new_username)
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username already taken",
+                )
+            user.username = new_username
+            token = create_access_token(new_username)
+
+    if data.password is not None and data.password.strip():
+        user.password_hash = hash_password(data.password)
+
+    if data.email is not None:
+        user.email = data.email
+
+    if data.whatsapp is not None:
+        user.whatsapp = data.whatsapp
+
     await user.save()
     return {
         "id": str(user.id),
@@ -153,4 +184,6 @@ async def update_profile(data: ProfileUpdateIn, user: User = Depends(get_current
         "email": user.email,
         "whatsapp": user.whatsapp,
         "created_at": user.created_at,
+        "access_token": token,
     }
+

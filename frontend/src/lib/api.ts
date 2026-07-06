@@ -123,7 +123,7 @@ export const api = {
     safeFetch(`${BASE}/api/bills/remind/${id}`, { method: 'POST' }),
 
   // Profile Settings
-  updateProfile: (data: { email?: string; whatsapp?: string }) =>
+  updateProfile: (data: { username?: string; password?: string; email?: string; whatsapp?: string }) =>
     safeFetch(`${BASE}/api/auth/profile`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

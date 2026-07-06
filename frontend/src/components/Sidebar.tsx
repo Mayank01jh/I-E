@@ -24,6 +24,8 @@ export default function Sidebar() {
 
   // Profile modal settings states
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [whatsappInput, setWhatsappInput] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
@@ -68,6 +70,7 @@ export default function Sidebar() {
 
     // Fetch user profile settings
     api.getMe().then(user => {
+      setUsernameInput(user.username || '');
       setEmailInput(user.email || '');
       setWhatsappInput(user.whatsapp || '');
     }).catch(err => {
@@ -84,8 +87,22 @@ export default function Sidebar() {
     e.preventDefault();
     setProfileSaving(true);
     try {
-      await api.updateProfile({ email: emailInput, whatsapp: whatsappInput });
+      const updatedUser = await api.updateProfile({
+        username: usernameInput,
+        password: passwordInput || undefined,
+        email: emailInput,
+        whatsapp: whatsappInput
+      });
+      if (updatedUser && updatedUser.username) {
+        setUsername(updatedUser.username);
+        localStorage.setItem('username', updatedUser.username);
+        if (updatedUser.access_token) {
+          localStorage.setItem('token', updatedUser.access_token);
+        }
+      }
+      setPasswordInput('');
       setIsProfileModalOpen(false);
+      alert('Profile updated successfully!');
     } catch (err: any) {
       alert(err.message || 'Failed to update profile settings');
     } finally {
@@ -311,8 +328,31 @@ export default function Sidebar() {
                 ✕
               </button>
             </div>
-            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Username</label>
+                <input 
+                  type="text" 
+                  className="input" 
+                  placeholder="e.g. johndoe"
+                  value={usernameInput}
+                  onChange={e => setUsernameInput(e.target.value)}
+                  style={{ width: '100%', background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}
+                  required
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Change Password</label>
+                <input 
+                  type="password" 
+                  className="input" 
+                  placeholder="Leave empty to keep current password"
+                  value={passwordInput}
+                  onChange={e => setPasswordInput(e.target.value)}
+                  style={{ width: '100%', background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Email Address</label>
                 <input 
                   type="email" 
@@ -323,8 +363,8 @@ export default function Sidebar() {
                   style={{ width: '100%', background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}
                 />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>WhatsApp Number</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Mobile Number / WhatsApp</label>
                 <input 
                   type="tel" 
                   className="input" 
@@ -333,7 +373,7 @@ export default function Sidebar() {
                   onChange={e => setWhatsappInput(e.target.value)}
                   style={{ width: '100%', background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}
                 />
-                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Include country code prefix (e.g. +91 or +1)</span>
+                <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>Include country code prefix (e.g. +91 or +1)</span>
               </div>
               <button 
                 type="submit" 
