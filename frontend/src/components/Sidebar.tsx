@@ -29,6 +29,8 @@ export default function Sidebar() {
   const [emailInput, setEmailInput] = useState('');
   const [whatsappInput, setWhatsappInput] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     // 1. Get username
@@ -86,6 +88,8 @@ export default function Sidebar() {
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setProfileSaving(true);
+    setProfileError(null);
+    setProfileSuccess(null);
     try {
       const updatedUser = await api.updateProfile({
         username: usernameInput,
@@ -101,10 +105,13 @@ export default function Sidebar() {
         }
       }
       setPasswordInput('');
-      setIsProfileModalOpen(false);
-      alert('Profile updated successfully!');
+      setProfileSuccess('Profile updated successfully!');
+      setTimeout(() => {
+        setIsProfileModalOpen(false);
+        setProfileSuccess(null);
+      }, 1500);
     } catch (err: any) {
-      alert(err.message || 'Failed to update profile settings');
+      setProfileError(err.message || 'Failed to update profile settings');
     } finally {
       setProfileSaving(false);
     }
@@ -329,6 +336,16 @@ export default function Sidebar() {
               </button>
             </div>
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {profileError && (
+                <div style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--accent-red)', borderRadius: 'var(--radius-sm)', color: 'var(--accent-red)', fontSize: '12px' }}>
+                  ⚠ {profileError}
+                </div>
+              )}
+              {profileSuccess && (
+                <div style={{ padding: '8px 12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid var(--accent-green)', borderRadius: 'var(--radius-sm)', color: 'var(--accent-green)', fontSize: '12px' }}>
+                  ✓ {profileSuccess}
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>Username</label>
                 <input 
