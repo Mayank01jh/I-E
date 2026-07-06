@@ -17,6 +17,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           (function() {
             var theme = localStorage.getItem('theme') || 'dark';
             document.documentElement.setAttribute('data-theme', theme);
+            var fixed = localStorage.getItem('fixed_ratio');
+            if (fixed === 'true') {
+              document.documentElement.setAttribute('data-fixed-ratio', 'true');
+            } else {
+              document.documentElement.removeAttribute('data-fixed-ratio');
+            }
           })();
         `}} />
       </head>
